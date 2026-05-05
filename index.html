@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Log Archive</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --bg-body: #f0ede8;
+            --bg-sidebar: rgba(252,250,247,0.97);
+            --bg-panel: #ffffff;
+            --accent: #2c2926;
+            --accent-text: #f8f5f1;
+            --border: #ddd9d3;
+            --border-light: #f0ede8;
+            --text-ui: #3a3632;
+            --text-muted: #8a857e;
+            --paper-bg-color: #ffffff;
+            --a6-w: 420px;
+            --a6-h: 595px;
+            --page-gap: 30px;
+            --para-gap: 0px;
+            --margin-top: 30px;
+            --margin-bottom: 30px;
+            --sidebar-width: 340px;
+            --zoom-scale: 1.5;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:-apple-system,'Segoe UI',sans-serif; background:var(--bg-body); display:flex; height:100vh; overflow:hidden; color:var(--text-ui); }
+        ::-webkit-scrollbar { width:5px; height:5px; }
+        ::-webkit-scrollbar-track { background:transparent; }
+        ::-webkit-scrollbar-thumb { background:var(--text-muted); border-radius:10px; }
+
+        /* ── SIDEBAR ── */
+        .sidebar {
+            position:relative; width:var(--sidebar-width); height:100vh;
+            background:var(--bg-sidebar); backdrop-filter:blur(20px); border-right:1px solid var(--border);
+            display:flex; flex-direction:column; z-index:100;
+            transition:transform 0.4s cubic-bezier(0.4,0,0.2,1);
+            flex-shrink:0; box-shadow:2px 0 20px rgba(0,0,0,0.03);
+        }
+        .sidebar.collapsed { transform:translateX(-100%); position:absolute; }
+        .toggle-btn {
+            position:absolute; right:-40px; top:15px; width:40px; height:40px;
+            background:var(--bg-sidebar); border:1px solid var(--border); border-left:none;
+            backdrop-filter:blur(20px); border-radius:0 10px 10px 0; cursor:pointer;
+            display:flex; align-items:center; justify-content:center;
+            color:var(--text-ui); font-size:1.1rem; z-index:101; transition:0.2s;
+        }
+        .sidebar-header { padding:22px 22px 14px; display:flex; justify-content:space-between; align-items:center; }
+        .sidebar-header h1 { font-family:'Cinzel',serif; font-size:1.15rem; letter-spacing:0.5px; font-weight:600; }
+        .close-mobile-btn { display:none; background:none; border:none; font-size:1.4rem; color:var(--text-ui); cursor:pointer; }
+        .tabs { display:flex; flex-shrink:0; padding:0 14px; border-bottom:1px solid var(--border); }
+        .tab { flex:1; padding:11px 0; font-size:0.8rem; font-weight:600; color:var(--text-muted); background:none; border:none; cursor:pointer; transition:0.3s; position:relative; width:auto; }
+        .tab.active { color:var(--text-ui); }
+        .tab.active::after { content:''; position:absolute; bottom:-1px; left:10%; width:80%; height:2px; background:var(--accent); border-radius:2px 2px 0 0; }
+        .sidebar-scroll { flex:1; overflow-y:auto; overflow-x:hidden; display:flex; flex-direction:column; }
+        .content { padding:18px 20px; display:none; flex-direction:column; gap:20px; }
+        .content.active { display:flex; }
+        .sidebar-footer { padding:15px 20px; border-top:1px solid var(--border); background:var(--bg-sidebar); flex-shrink:0; }
+        .stats-bar { display:flex; justify-content:space-between; font-size:0.73rem; color:var(--text-muted); margin-bottom:11px; font-weight:500; }
+        .save-tools { display:flex; gap:7px; margin-bottom:9px; }
+        .save-tools button { flex:1; padding:9px 6px; font-size:0.73rem; border-radius:8px; border:1px solid var(--border); background:var(--bg-panel); color:var(--text-ui); cursor:pointer; font-weight:500; transition:0.2s; width:auto; }
+        .save-tools button:hover { border-color:var(--text-muted); }
+        .btn-primary { background:var(--accent); color:var(--accent-text); border:none; width:100%; font-weight:600; font-size:0.83rem; padding:13px; border-radius:10px; cursor:pointer; transition:0.2s; }
+        .btn-primary:hover { opacity:0.88; transform:translateY(-1px); }
+
+        /* ── ITEM LAYOUT ── */
+        .item { display:flex; flex-direction:column; gap:9px; }
+        .item > label { font-size:0.79rem; font-weight:700; color:var(--text-ui); display:flex; justify-content:space-between; align-items:baseline; }
+        .item > label span { font-size:0.69rem; color:var(--text-muted); font-weight:400; }
+        .sep { border-top:1px dashed var(--border); padding-top:18px; margin-top:2px; }
+        .row { display:flex; gap:7px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+        .fmt-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+
+        /* ── GENERIC BUTTONS in sidebar ── */
+        .sidebar button:not(.tab):not(.toggle-btn):not(.close-mobile-btn):not(.btn-primary):not(.fav-star):not(.font-apply-btn):not(.iapply):not(.ireset):not(.seg-btn):not(.load-font-btn):not(.btn-add) {
+            padding:9px 13px; border:1px solid var(--border); border-radius:8px;
+            background:var(--bg-panel); font-size:0.79rem; color:var(--text-ui);
+            cursor:pointer; font-family:inherit; transition:0.2s; width:100%;
+        }
+        .sidebar button:not(.tab):not(.toggle-btn):not(.close-mobile-btn):not(.btn-primary):not(.fav-star):not(.font-apply-btn):not(.iapply):not(.ireset):not(.seg-btn):not(.load-font-btn):not(.btn-add):hover { background:var(--border-light); }
+
+        select { padding:9px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg-panel); font-size:0.79rem; color:var(--text-ui); cursor:pointer; font-family:inherit; transition:0.2s; width:100%; }
+        select:focus { outline:none; border-color:var(--accent); }
+
+        /* ── NUM INPUT ── */
+        .num-input { width:70px; padding:7px 9px; border:1px solid var(--border); border-radius:7px; background:var(--bg-panel); color:var(--text-ui); font-size:0.78rem; font-family:inherit; transition:0.2s; text-align:right; flex-shrink:0; }
+        .num-input:focus { outline:none; border-color:var(--accent); }
+        .typo-row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+        .typo-label { font-size:0.75rem; font-weight:500; color:var(--text-ui); flex:1; }
+        .unit-tag { font-size:0.68rem; color:var(--text-muted); margin-left:2px; }
+
+        /* ── COLOR ── */
+        .color-box { display:flex; align-items:center; gap:9px; border:1px solid var(--border); padding:7px 11px; border-radius:8px; flex:1; background:var(--bg-panel); }
+        input[type="color"] { width:22px; height:22px; padding:0; border:none; background:none; cursor:pointer; border-radius:50%; flex-shrink:0; }
+        .palette { display:flex; flex-wrap:wrap; gap:7px; padding-top:3px; }
+        .swatch { width:22px; height:22px; border-radius:50%; border:1px solid var(--border); cursor:pointer; transition:0.2s; }
+        .swatch:hover { transform:scale(1.18); border-color:var(--text-muted); }
+        .btn-add { padding:7px 10px; font-size:0.72rem; background:transparent; border:1px dashed var(--border); color:var(--text-muted); font-weight:500; border-radius:7px; transition:0.2s; cursor:pointer; width:100%; }
+        .btn-add:hover { border-color:var(--text-muted); color:var(--text-ui); }
+
+        /* ── INLINE APPLY / RESET BUTTONS ── */
+        .iapply { padding:7px 11px; width:auto; font-weight:700; font-size:0.74rem; background:var(--accent); color:var(--accent-text); border:none; border-radius:7px; cursor:pointer; flex-shrink:0; transition:0.15s; }
+        .iapply:hover { opacity:0.84; }
+        .ireset { padding:7px 10px; width:auto; font-size:0.74rem; border:1px solid var(--border); border-radius:7px; background:var(--bg-panel); color:var(--text-ui); cursor:pointer; flex-shrink:0; transition:0.15s; }
+        .ireset:hover { background:var(--border-light); }
+
+        /* ── SEGMENT CONTROL ── */
+        .seg-ctrl { display:flex; background:var(--border-light); border-radius:8px; padding:3px; gap:3px; }
+        .seg-btn { flex:1; padding:7px; font-size:0.78rem; font-weight:500; border:none; border-radius:6px; background:transparent; color:var(--text-muted); cursor:pointer; transition:0.2s; width:auto; }
+        .seg-btn.on { background:var(--bg-panel); color:var(--text-ui); font-weight:700; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+
+        /* ── LOCAL FONT LIST ── */
+        .font-search { width:100%; padding:8px 11px; border:1px solid var(--border); border-radius:8px; background:var(--bg-panel); color:var(--text-ui); font-size:0.79rem; font-family:inherit; outline:none; transition:0.2s; }
+        .font-search:focus { border-color:var(--accent); }
+        .font-list-wrap { border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--bg-panel); }
+        .font-sec-lbl { font-size:0.67rem; font-weight:700; color:var(--text-muted); padding:5px 10px 3px; background:var(--border-light); letter-spacing:0.05em; text-transform:uppercase; }
+        .font-list { max-height:185px; overflow-y:auto; }
+        .font-item { display:flex; align-items:center; gap:5px; padding:5px 9px; border-bottom:1px solid var(--border-light); }
+        .font-item:last-child { border-bottom:none; }
+        .font-item:hover { background:var(--border-light); }
+        .fav-star { background:none; border:none; font-size:1rem; cursor:pointer; padding:0; width:18px; color:var(--border); flex-shrink:0; transition:color 0.15s; line-height:1; }
+        .fav-star.starred { color:#f59e0b; }
+        .fav-star:hover { color:#f59e0b; }
+        .font-name { flex:1; font-size:0.82rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .font-apply-btn { font-size:0.68rem; padding:3px 8px; border:1px solid var(--border); border-radius:4px; background:var(--bg-panel); cursor:pointer; flex-shrink:0; width:auto; color:var(--text-ui); transition:0.15s; }
+        .font-apply-btn:hover { background:var(--accent); color:var(--accent-text); border-color:var(--accent); }
+        .font-empty { padding:12px 10px; font-size:0.75rem; color:var(--text-muted); text-align:center; line-height:1.7; }
+        .load-font-btn { padding:8px 12px; border:1px dashed var(--border); border-radius:8px; background:transparent; color:var(--text-muted); font-size:0.76rem; cursor:pointer; width:100%; transition:0.2s; font-family:inherit; }
+        .load-font-btn:hover { border-color:var(--text-muted); color:var(--text-ui); }
+
+        /* ── SELECTION HINT ── */
+        .sel-hint { font-size:0.69rem; color:var(--text-muted); padding:5px 8px; background:var(--border-light); border-radius:6px; text-align:center; line-height:1.5; }
+
+        /* ── WORKSPACE ── */
+        .workspace { flex:1; overflow:auto; position:relative; scroll-behavior:smooth; }
+        .scroll-content { display:flex; align-items:center; width:max-content; margin:0 auto; min-height:100%; padding:50px; box-sizing:border-box; }
+        .scale-placeholder { position:relative; margin:0 auto; }
+        .zoom-wrap { position:absolute; top:0; left:0; transform:scale(var(--zoom-scale)); transform-origin:top left; display:inline-flex; transition:transform 0.3s ease; }
+        .a6-canvas { position:relative; height:var(--a6-h); display:flex; transition:width 0.3s; }
+        .bg-layer { position:absolute; top:0; left:0; height:100%; display:flex; gap:var(--page-gap); z-index:0; pointer-events:none; width:max-content; }
+        .page-bg { width:var(--a6-w); height:var(--a6-h); flex-shrink:0; background-color:var(--paper-bg-color); background-size:cover; background-position:center; box-shadow:0 5px 28px rgba(0,0,0,0.08); }
+        .content-layer { position:relative; z-index:10; display:flex; }
+
+        .editor {
+            height:calc(var(--a6-h) - var(--margin-top) - var(--margin-bottom));
+            width:calc(var(--a6-w) - 80px);
+            margin-top:var(--margin-top);
+            margin-left:40px;
+            column-width:calc(var(--a6-w) - 80px);
+            column-gap:calc(var(--page-gap) + 80px);
+            box-sizing:border-box; padding:0;
+            outline:none; text-align:justify; white-space:pre-wrap; word-break:break-all;
+            font-size:10.5px; letter-spacing:-0.5px; line-height:1.7;
+            color:#3d3a36; text-indent:1.2em;
+        }
+        .editor::after { content:attr(data-placeholder); color:var(--text-muted); pointer-events:none; text-indent:0; display:block; font-weight:400; font-size:10px; }
+        .editor:not(:empty)::after { display:none; }
+        .editor div, .editor p { text-indent:1.2em; margin:0; margin-bottom:var(--para-gap,0px); }
+
+        /* ── HIGHLIGHT: 아래 1/3 두께 (gradient) ── */
+        .hl-span {
+            -webkit-box-decoration-break:clone;
+            box-decoration-break:clone;
+        }
+
+        /* ── PAGE CONTROLS ── */
+        .page-controls {
+            position:fixed; bottom:32px; left:calc(50% + calc(var(--sidebar-width)/2)); transform:translateX(-50%);
+            background:var(--bg-sidebar); backdrop-filter:blur(10px); border:1px solid var(--border);
+            padding:8px 20px; border-radius:30px; display:flex; gap:14px; align-items:center;
+            box-shadow:0 4px 15px rgba(0,0,0,0.06); z-index:1000; transition:left 0.4s;
+        }
+        .page-controls button { background:none; border:none; font-size:1rem; cursor:pointer; color:var(--text-muted); width:auto; padding:0 5px; transition:0.2s; }
+        .page-controls button:hover { color:var(--accent); }
+        #pageIndicator { font-size:0.84rem; font-weight:600; color:var(--text-ui); min-width:42px; text-align:center; }
+
+        /* ── TOAST ── */
+        #toast { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:rgba(44,41,38,0.9); color:#f5f2ee; padding:8px 16px; border-radius:20px; font-size:0.77rem; z-index:9999; opacity:0; transition:opacity 0.25s; pointer-events:none; white-space:nowrap; }
+
+        .hidden { display:none !important; }
+
+        @media (max-width:1100px) { .page-controls { left:50%; } }
+        @media (max-height:800px) { .scroll-content { align-items:flex-start; } }
+        @media (max-width:768px) {
+            .sidebar { position:fixed; height:100%; width:100%; max-width:360px; box-shadow:5px 0 30px rgba(0,0,0,0.1); }
+            .sidebar.collapsed { transform:translateX(-100%); }
+            .scroll-content { padding:20px; align-items:flex-start; margin:0; }
+            .toggle-btn { top:auto; bottom:32px; border-radius:0 8px 8px 0; }
+            .page-controls { bottom:88px; }
+            .close-mobile-btn { display:block; }
+        }
+    </style>
+</head>
+<body>
+<div id="toast"></div>
+
+<!-- ════ SIDEBAR ════ -->
+<div class="sidebar collapsed" id="sidebar">
+    <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
+    <div class="sidebar-header">
+        <h1>Log Archive</h1>
+        <button class="close-mobile-btn" onclick="toggleSidebar()">✕</button>
+    </div>
+
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('t-design')">글씨 및 꾸미기</button>
+        <button class="tab" onclick="switchTab('t-layout')">페이지 레이아웃</button>
+    </div>
+
+    <div class="sidebar-scroll">
+
+        <!-- ── TAB 1: 글씨 및 꾸미기 ── -->
+        <div id="t-design" class="content active">
+
+            <!-- 로컬 폰트 -->
+            <div class="item">
+                <label>서체 <span id="fontCountLbl">로컬 폰트</span></label>
+                <button class="load-font-btn" id="btnLoadFonts" onclick="loadLocalFonts()">🔄 시스템 설치 폰트 불러오기</button>
+                <input type="text" class="font-search" id="fontSearch" placeholder="폰트 검색..." oninput="filterFonts(this.value)">
+                <div class="font-list-wrap">
+                    <div id="favFontSection" class="hidden">
+                        <div class="font-sec-lbl">★ 즐겨찾기</div>
+                        <div class="font-list" id="favFontList"></div>
+                    </div>
+                    <div id="allFontSection">
+                        <div class="font-sec-lbl">전체</div>
+                        <div class="font-list" id="allFontList">
+                            <div class="font-empty">위 버튼으로 시스템 폰트를 불러오세요<br><small style="color:var(--text-muted)">(Chrome 103+ 필요)</small></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 선택 영역 서식: font-size / weight -->
+            <div class="item sep">
+                <label>선택 영역 서식 <span>드래그 선택 후 적용</span></label>
+                <div class="sel-hint">아래 값은 드래그한 텍스트에만 적용됩니다</div>
+                <div class="typo-row">
+                    <span class="typo-label">폰트 크기 <span class="unit-tag">(px)</span></span>
+                    <input type="number" id="selFontSize" class="num-input" value="10.5" step="0.5" min="5" max="72">
+                    <button class="iapply" onclick="applySelStyle('fontSize', document.getElementById('selFontSize').value+'px')">적용</button>
+                </div>
+                <div class="typo-row">
+                    <span class="typo-label">굵기 <span class="unit-tag">(weight)</span></span>
+                    <input type="number" id="selFontWeight" class="num-input" value="400" step="100" min="100" max="900">
+                    <button class="iapply" onclick="applySelStyle('fontWeight', document.getElementById('selFontWeight').value)">적용</button>
+                </div>
+            </div>
+
+            <!-- 전역 타이포그래피 -->
+            <div class="item sep">
+                <label>전체 타이포그래피</label>
+                <div class="typo-row">
+                    <span class="typo-label">줄 간격 <span class="unit-tag">(line-height)</span></span>
+                    <input type="number" id="lineHeight" class="num-input" value="1.7" step="0.05" min="0.8" max="5" oninput="updateGlobalTypo()">
+                </div>
+                <div class="typo-row">
+                    <span class="typo-label">자간 <span class="unit-tag">(px)</span></span>
+                    <input type="number" id="letterSpacing" class="num-input" value="-0.5" step="0.1" min="-5" max="10" oninput="updateGlobalTypo()">
+                </div>
+                <div class="typo-row" style="border-top:1px solid var(--border-light);padding-top:8px;margin-top:2px;">
+                    <span class="typo-label">문단 사이 간격 <span class="unit-tag">(px)</span></span>
+                    <input type="number" id="paraGap" class="num-input" value="0" step="1" min="0" max="100" oninput="updateGlobalTypo()">
+                </div>
+            </div>
+
+            <!-- 글자색 -->
+            <div class="item sep">
+                <label>글자색 <span>우클릭/꾸욱 눌러 즐겨찾기 삭제</span></label>
+                <div class="row">
+                    <div class="color-box">
+                        <input type="color" id="tc" value="#3d3a36">
+                        <span style="font-size:0.73rem;font-weight:500;">색 선택</span>
+                    </div>
+                    <button class="iapply" onclick="applyFmt('foreColor','tc')">적용</button>
+                    <button class="ireset" onclick="resetTextColor()">초기화</button>
+                </div>
+                <div class="palette" id="tc-favs"></div>
+                <button class="btn-add" onclick="addFav('text')">+ 현재 색상 즐겨찾기에 추가</button>
+            </div>
+
+            <!-- 형광펜 -->
+            <div class="item">
+                <label>형광펜 칠하기 <span>아래 1/3 두께 · 우클릭으로 즐겨찾기 삭제</span></label>
+                <div class="row">
+                    <div class="color-box">
+                        <input type="color" id="hc" value="#fef08a">
+                        <span style="font-size:0.73rem;font-weight:500;">색 선택</span>
+                    </div>
+                    <button class="iapply" onclick="applyHighlight(document.getElementById('hc').value)">칠하기</button>
+                    <button class="ireset" onclick="removeHighlight()">지우기</button>
+                </div>
+                <div class="palette" id="hc-favs"></div>
+                <button class="btn-add" onclick="addFav('hl')">+ 현재 색상 즐겨찾기에 추가</button>
+            </div>
+
+            <!-- 텍스트 서식 -->
+            <div class="item">
+                <label>텍스트 서식 및 실행 취소</label>
+                <div class="fmt-grid">
+                    <button onclick="applyFmt('bold',null)" style="font-weight:700;">굵게</button>
+                    <button onclick="applyFmt('italic',null)" style="font-style:italic;">기울임</button>
+                    <button onclick="applyFmt('underline',null)" style="text-decoration:underline;">밑줄</button>
+                </div>
+                <div class="fmt-grid" style="margin-top:2px;">
+                    <button onclick="document.execCommand('undo')" style="font-size:0.73rem;">↩ 뒤로</button>
+                    <button onclick="document.execCommand('redo')" style="font-size:0.73rem;">앞으로 ↪</button>
+                    <button onclick="toggleQuotes()" style="font-size:0.73rem;font-weight:700;color:var(--accent);">" ↔ " 변환</button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ── TAB 2: 페이지 레이아웃 ── -->
+        <div id="t-layout" class="content">
+
+            <!-- 용지 크기 (NEW) -->
+            <div class="item">
+                <label>용지 크기</label>
+                <div class="seg-ctrl">
+                    <button class="seg-btn on" id="btnA6" onclick="setPageSize('A6')">A6</button>
+                    <button class="seg-btn" id="btnA5" onclick="setPageSize('A5')">A5</button>
+                </div>
+            </div>
+
+            <!-- 용지 방향 -->
+            <div class="item">
+                <label>용지 방향</label>
+                <div class="seg-ctrl">
+                    <button class="seg-btn on" id="btnP" onclick="setOrientation('P')">세로형</button>
+                    <button class="seg-btn" id="btnL" onclick="setOrientation('L')">가로형</button>
+                </div>
+            </div>
+
+            <!-- 여백 (NEW) -->
+            <div class="item sep">
+                <label>페이지 여백</label>
+                <div class="typo-row">
+                    <span class="typo-label">상단 여백 <span class="unit-tag">(px)</span></span>
+                    <input type="number" id="marginTop" class="num-input" value="30" step="2" min="0" max="200" oninput="updateMargins()">
+                </div>
+                <div class="typo-row">
+                    <span class="typo-label">하단 여백 <span class="unit-tag">(px)</span></span>
+                    <input type="number" id="marginBottom" class="num-input" value="30" step="2" min="0" max="200" oninput="updateMargins()">
+                </div>
+            </div>
+
+            <!-- 배경 -->
+            <div class="item sep">
+                <label>안쪽 종이 배경 <span>상/하단 다르면 그라데이션</span></label>
+                <div class="row" style="background:var(--bg-panel);border:1px solid var(--border);padding:8px 12px;border-radius:8px;">
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <input type="color" id="pTop" value="#ffffff" onchange="updatePaperBg()" style="width:24px;height:24px;padding:0;border:none;background:none;cursor:pointer;">
+                        <span style="font-size:0.7rem;font-weight:600;">상단</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <input type="color" id="pBot" value="#ffffff" onchange="updatePaperBg()" style="width:24px;height:24px;padding:0;border:none;background:none;cursor:pointer;">
+                        <span style="font-size:0.7rem;font-weight:600;">하단</span>
+                    </div>
+                    <button onclick="document.getElementById('pImg').click()" style="width:auto;padding:6px 10px;font-size:0.7rem;">이미지</button>
+                    <input type="file" id="pImg" class="hidden" accept="image/*" onchange="handleImg(event)">
+                    <button onclick="resetPaperBg()" style="width:auto;padding:6px 10px;font-size:0.7rem;">리셋</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="sidebar-footer">
+        <div class="stats-bar">
+            <span>공백 제외: <span id="charCount" style="color:var(--text-ui);font-weight:700;">0</span>자</span>
+            <span>총 <span id="pageCount" style="color:var(--text-ui);font-weight:700;">1</span>페이지</span>
+        </div>
+        <div class="save-tools">
+            <button onclick="copyImageToClipboard()" id="btnCopy">📋 클립보드에 복사</button>
+            <button onclick="clearManual()" style="color:#c0392b;flex:0.55;">초기화</button>
+        </div>
+        <button id="btnExportCur" class="btn-primary" onclick="exportCurrentPage()">현재 페이지 이미지 저장</button>
+    </div>
+</div>
+
+<!-- ════ WORKSPACE ════ -->
+<div class="workspace" id="workspace">
+    <div id="scrollContent" class="scroll-content">
+        <div id="scalePlaceholder" class="scale-placeholder">
+            <div class="zoom-wrap">
+                <div class="a6-canvas" id="canvas">
+                    <div class="bg-layer" id="bgLayer"></div>
+                    <div class="content-layer">
+                        <div class="editor" id="editor" contenteditable="true"
+                             data-placeholder="이곳을 클릭하여 글을 작성하세요. 붙여넣기 시 텍스트 서식이 자동으로 제거됩니다."></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="page-controls">
+    <button onclick="prevPage()">◀</button>
+    <span id="pageIndicator">1 / 1</span>
+    <button onclick="nextPage()">▶</button>
+</div>
+
+<script>
+/* ═══════════════════════════════════════
+   STATE
+═══════════════════════════════════════ */
+const root             = document.documentElement;
+const editor           = document.getElementById('editor');
+const bgLayer          = document.getElementById('bgLayer');
+const sidebar          = document.getElementById('sidebar');
+const workspace        = document.getElementById('workspace');
+const scalePlaceholder = document.getElementById('scalePlaceholder');
+
+let pageSizeKey      = 'A6';   // 'A6' | 'A5'
+let isL              = false;  // landscape
+let currentPageIndex = 0;
+let globalPaperBgImg = 'none';
+
+let localFonts = [];
+let favFonts   = [];
+let favTC      = [];
+let favHC      = [];
+
+const PAGE_DIMS = {
+    A6: { P:[420,595], L:[595,420] },
+    A5: { P:[560,794], L:[794,560] }
+};
+function getPageW() { return PAGE_DIMS[pageSizeKey][isL?'L':'P'][0]; }
+function getPageH() { return PAGE_DIMS[pageSizeKey][isL?'L':'P'][1]; }
+
+/* ═══════════════════════════════════════
+   SETTINGS PERSISTENCE
+═══════════════════════════════════════ */
+const SKEY = 'la2_settings';
+function saveSettings() {
+    localStorage.setItem(SKEY, JSON.stringify({
+        lineHeight:    document.getElementById('lineHeight').value,
+        letterSpacing: document.getElementById('letterSpacing').value,
+        paraGap:       document.getElementById('paraGap').value,
+        marginTop:     document.getElementById('marginTop').value,
+        marginBottom:  document.getElementById('marginBottom').value,
+        pageSizeKey, isL
+    }));
+}
+function loadSettings() {
+    try {
+        const s = JSON.parse(localStorage.getItem(SKEY) || '{}');
+        if (s.lineHeight)    document.getElementById('lineHeight').value    = s.lineHeight;
+        if (s.letterSpacing) document.getElementById('letterSpacing').value = s.letterSpacing;
+        if (s.paraGap)       document.getElementById('paraGap').value       = s.paraGap;
+        if (s.marginTop)     document.getElementById('marginTop').value     = s.marginTop;
+        if (s.marginBottom)  document.getElementById('marginBottom').value  = s.marginBottom;
+        if (s.pageSizeKey)   pageSizeKey = s.pageSizeKey;
+        if (typeof s.isL === 'boolean') isL = s.isL;
+    } catch(e) {}
+}
+
+/* ═══════════════════════════════════════
+   INIT
+═══════════════════════════════════════ */
+window.onload = () => {
+    loadSettings();
+    favTC      = JSON.parse(localStorage.getItem('la2_tc')       || '["#3d3a36","#6b3232","#1e3a8a"]');
+    favHC      = JSON.parse(localStorage.getItem('la2_hc')       || '["#fef08a","#bbf7d0","#fbcfe8"]');
+    localFonts = JSON.parse(localStorage.getItem('la2_fonts')    || '[]');
+    favFonts   = JSON.parse(localStorage.getItem('la2_favfonts') || '[]');
+
+    applyPageDims(); updateSizeOrientBtns();
+    updateGlobalTypo(); updateMargins();
+    renderFavs(); renderFontList('');
+
+    if (localFonts.length > 0) {
+        document.getElementById('fontCountLbl').textContent = localFonts.length + '개';
+        document.getElementById('btnLoadFonts').textContent = '🔄 다시 불러오기';
+    }
+
+    const saved = localStorage.getItem('la2_content');
+    if (saved) editor.innerHTML = saved;
+
+    if (window.innerWidth >= 768) sidebar.classList.remove('collapsed');
+    calcZoomScale(); checkPages(); updateStats();
+};
+
+/* ═══════════════════════════════════════
+   PAGE SIZE & ORIENTATION
+═══════════════════════════════════════ */
+function applyPageDims() {
+    root.style.setProperty('--a6-w', getPageW() + 'px');
+    root.style.setProperty('--a6-h', getPageH() + 'px');
+}
+function setPageSize(k) {
+    pageSizeKey = k; applyPageDims(); updateSizeOrientBtns();
+    calcZoomScale(); setTimeout(() => { checkPages(); scrollToPage(0); }, 100);
+    saveSettings();
+}
+function setOrientation(o) {
+    isL = (o === 'L'); applyPageDims(); updateSizeOrientBtns();
+    calcZoomScale(); setTimeout(() => { checkPages(); scrollToPage(0); }, 100);
+    saveSettings();
+}
+function updateSizeOrientBtns() {
+    document.getElementById('btnA6').classList.toggle('on', pageSizeKey === 'A6');
+    document.getElementById('btnA5').classList.toggle('on', pageSizeKey === 'A5');
+    document.getElementById('btnP').classList.toggle('on', !isL);
+    document.getElementById('btnL').classList.toggle('on',  isL);
+}
+
+/* ═══════════════════════════════════════
+   GLOBAL TYPOGRAPHY
+═══════════════════════════════════════ */
+function updateGlobalTypo() {
+    editor.style.lineHeight    = document.getElementById('lineHeight').value;
+    editor.style.letterSpacing = document.getElementById('letterSpacing').value + 'px';
+    root.style.setProperty('--para-gap', document.getElementById('paraGap').value + 'px');
+    saveSettings();
+}
+
+/* ═══════════════════════════════════════
+   MARGINS
+═══════════════════════════════════════ */
+function updateMargins() {
+    root.style.setProperty('--margin-top',    document.getElementById('marginTop').value + 'px');
+    root.style.setProperty('--margin-bottom', document.getElementById('marginBottom').value + 'px');
+    setTimeout(checkPages, 50);
+    saveSettings();
+}
+
+/* ═══════════════════════════════════════
+   LOCAL FONTS
+═══════════════════════════════════════ */
+async function loadLocalFonts() {
+    const btn = document.getElementById('btnLoadFonts');
+    if (!('queryLocalFonts' in window)) {
+        showToast('Chrome 103 이상에서만 지원됩니다'); return;
+    }
+    btn.textContent = '불러오는 중...';
+    try {
+        const fonts   = await window.queryLocalFonts();
+        const families = [...new Set(fonts.map(f => f.family))].sort((a,b) => a.localeCompare(b, 'ko'));
+        localFonts = families;
+        localStorage.setItem('la2_fonts', JSON.stringify(localFonts));
+        document.getElementById('fontCountLbl').textContent = families.length + '개';
+        btn.textContent = '✓ ' + families.length + '개 로드됨';
+        setTimeout(() => { btn.textContent = '🔄 다시 불러오기'; }, 2800);
+        renderFontList(document.getElementById('fontSearch').value);
+    } catch(e) {
+        showToast(e.name === 'NotAllowedError' ? '브라우저 권한을 허용해 주세요' : '로드 실패: ' + e.message);
+        btn.textContent = '🔄 시스템 설치 폰트 불러오기';
+    }
+}
+function filterFonts(q) { renderFontList(q); }
+function renderFontList(q) {
+    q = (q || '').toLowerCase();
+    const filtered = q ? localFonts.filter(f => f.toLowerCase().includes(q)) : localFonts;
+
+    const favSec  = document.getElementById('favFontSection');
+    const favList = document.getElementById('favFontList');
+    favList.innerHTML = '';
+    if (favFonts.length > 0 && !q) {
+        favSec.classList.remove('hidden');
+        favFonts.forEach(f => favList.appendChild(makeFontItem(f)));
+    } else {
+        favSec.classList.add('hidden');
+    }
+
+    const allList = document.getElementById('allFontList');
+    allList.innerHTML = '';
+    if (filtered.length === 0) {
+        allList.innerHTML = '<div class="font-empty">' +
+            (localFonts.length === 0
+                ? '위 버튼으로 시스템 폰트를 불러오세요<br><small>(Chrome 103+ 필요)</small>'
+                : '검색 결과 없음') +
+            '</div>';
+    } else {
+        filtered.forEach(f => allList.appendChild(makeFontItem(f)));
+    }
+}
+function makeFontItem(family) {
+    const div  = document.createElement('div'); div.className = 'font-item';
+    const star = document.createElement('button');
+    star.className = 'fav-star' + (favFonts.includes(family) ? ' starred' : '');
+    star.textContent = '★'; star.title = '즐겨찾기';
+    star.onclick = e => { e.stopPropagation(); toggleFavFont(family); };
+    const name = document.createElement('span'); name.className = 'font-name';
+    name.textContent = family; name.style.fontFamily = "'" + family + "',serif";
+    const applyBtn = document.createElement('button'); applyBtn.className = 'font-apply-btn';
+    applyBtn.textContent = '적용';
+    applyBtn.onclick = () => applySelStyle('fontFamily', "'" + family + "',serif");
+    div.appendChild(star); div.appendChild(name); div.appendChild(applyBtn);
+    return div;
+}
+function toggleFavFont(family) {
+    if (favFonts.includes(family)) favFonts = favFonts.filter(f => f !== family);
+    else favFonts.unshift(family);
+    localStorage.setItem('la2_favfonts', JSON.stringify(favFonts));
+    renderFontList(document.getElementById('fontSearch').value);
+}
+
+/* ═══════════════════════════════════════
+   SELECTION STYLE (font-family / size / weight → 선택 영역만)
+═══════════════════════════════════════ */
+function applySelStyle(prop, val) {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || sel.isCollapsed) {
+        showToast('텍스트를 먼저 드래그로 선택하세요'); return;
+    }
+    const range = sel.getRangeAt(0);
+    const frag  = range.extractContents();
+    const span  = document.createElement('span');
+    span.style[prop] = val;
+    span.appendChild(frag);
+    range.insertNode(span);
+    const nr = document.createRange();
+    nr.selectNodeContents(span);
+    sel.removeAllRanges(); sel.addRange(nr);
+    editor.focus(); saveContent();
+}
+
+/* ═══════════════════════════════════════
+   HIGHLIGHT: 아래 1/3 두께
+═══════════════════════════════════════ */
+function applyHighlight(color) {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || sel.isCollapsed) {
+        showToast('텍스트를 먼저 드래그로 선택하세요'); return;
+    }
+    const range = sel.getRangeAt(0);
+    const frag  = range.extractContents();
+    const span  = document.createElement('span');
+    span.className = 'hl-span';
+    span.dataset.hlColor = color;
+    // 아래 33% 만 칠하는 gradient
+    span.style.backgroundImage = 'linear-gradient(to top,' + color + ' 33%,transparent 33%)';
+    span.style.backgroundRepeat = 'no-repeat';
+    span.appendChild(frag);
+    range.insertNode(span);
+    const nr = document.createRange();
+    nr.selectNodeContents(span);
+    sel.removeAllRanges(); sel.addRange(nr);
+    editor.focus(); saveContent();
+}
+function removeHighlight() {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) { editor.focus(); return; }
+    const range = sel.getRangeAt(0);
+    editor.querySelectorAll('.hl-span').forEach(span => {
+        if (range.intersectsNode(span)) {
+            const p = span.parentNode;
+            while (span.firstChild) p.insertBefore(span.firstChild, span);
+            p.removeChild(span);
+        }
+    });
+    editor.focus(); saveContent();
+}
+
+/* ═══════════════════════════════════════
+   FORMAT COMMANDS
+═══════════════════════════════════════ */
+function applyFmt(cmd, id) {
+    const val = id ? document.getElementById(id).value : null;
+    document.execCommand('styleWithCSS', false, true);
+    if (cmd === 'hiliteColor') {
+        if (!document.execCommand('hiliteColor', false, val)) document.execCommand('backColor', false, val);
+    } else {
+        document.execCommand(cmd, false, val);
+    }
+    editor.focus();
+}
+function resetTextColor() {
+    document.execCommand('styleWithCSS', false, true);
+    document.execCommand('foreColor', false, '#3d3a36');
+    editor.focus();
+}
+
+/* ═══════════════════════════════════════
+   FAV COLORS
+═══════════════════════════════════════ */
+function renderFavs() {
+    ['tc','hc'].forEach(type => {
+        const box = document.getElementById(type + '-favs');
+        box.innerHTML = '';
+        (type === 'tc' ? favTC : favHC).forEach(c => {
+            const d = document.createElement('div');
+            d.className = 'swatch'; d.style.background = c;
+            d.title = '클릭: 적용 / 우클릭·꾸욱: 삭제';
+            if (type === 'tc') d.onclick = () => { document.getElementById('tc').value = c; applyFmt('foreColor','tc'); };
+            else               d.onclick = () => { document.getElementById('hc').value = c; applyHighlight(c); };
+            bindLongPress(d, type, c); box.appendChild(d);
+        });
+    });
+}
+function addFav(type) {
+    const id = (type === 'text') ? 'tc' : 'hc';
+    const c  = document.getElementById(id).value;
+    if (type === 'text') {
+        if (!favTC.includes(c)) { favTC.push(c); localStorage.setItem('la2_tc', JSON.stringify(favTC)); }
+    } else {
+        if (!favHC.includes(c)) { favHC.push(c); localStorage.setItem('la2_hc', JSON.stringify(favHC)); }
+    }
+    renderFavs();
+}
+function deleteFav(type, color) {
+    if (!confirm('해당 색상을 즐겨찾기에서 삭제하시겠습니까?')) return;
+    if (type === 'tc') { favTC = favTC.filter(c => c!==color); localStorage.setItem('la2_tc', JSON.stringify(favTC)); }
+    else               { favHC = favHC.filter(c => c!==color); localStorage.setItem('la2_hc', JSON.stringify(favHC)); }
+    renderFavs();
+}
+function bindLongPress(el, type, color) {
+    let t;
+    const s = e => { if (e.type==='mousedown'&&e.button!==0) return; t=setTimeout(()=>deleteFav(type,color),600); };
+    const c = () => clearTimeout(t);
+    el.addEventListener('mousedown',s); el.addEventListener('touchstart',s);
+    el.addEventListener('mouseup',c);   el.addEventListener('mouseleave',c);
+    el.addEventListener('touchend',c);  el.addEventListener('touchmove',c);
+    el.oncontextmenu = e => { e.preventDefault(); deleteFav(type,color); };
+}
+
+/* ═══════════════════════════════════════
+   PAPER BACKGROUND
+═══════════════════════════════════════ */
+function updatePaperBg() {
+    const top = document.getElementById('pTop').value;
+    const bot = document.getElementById('pBot').value;
+    root.style.setProperty('--paper-bg-color', top);
+    globalPaperBgImg = (top===bot) ? 'none' : 'linear-gradient(to bottom,'+top+','+bot+')';
+    renderBg();
+}
+function handleImg(e) {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => { globalPaperBgImg = 'url("'+ev.target.result+'")'; renderBg(); };
+    r.readAsDataURL(f); e.target.value = '';
+}
+function resetPaperBg() {
+    document.getElementById('pTop').value = '#ffffff';
+    document.getElementById('pBot').value = '#ffffff';
+    root.style.setProperty('--paper-bg-color','#ffffff');
+    globalPaperBgImg = 'none'; renderBg();
+}
+function renderBg() {
+    document.querySelectorAll('.page-bg').forEach(el => el.style.backgroundImage = globalPaperBgImg);
+}
+
+/* ═══════════════════════════════════════
+   ZOOM / SCALE
+═══════════════════════════════════════ */
+function calcZoomScale() {
+    const pw = getPageW(), w = window.innerWidth;
+    root.style.setProperty('--zoom-scale', w<=768 ? (w-40)/pw : 1.5);
+    setTimeout(checkPages, 50);
+}
+function getScale() {
+    return parseFloat(getComputedStyle(root).getPropertyValue('--zoom-scale')) || 1.5;
+}
+
+/* ═══════════════════════════════════════
+   PAGE MANAGEMENT
+═══════════════════════════════════════ */
+new ResizeObserver(() => checkPages()).observe(editor);
+
+function checkPages() {
+    const pw = getPageW(), ph = getPageH(), gap = 30;
+    const cw = editor.clientWidth, cg = gap + 80;
+    const pages = Math.max(1, Math.round((editor.scrollWidth + cg) / (cw + cg)));
+    while (bgLayer.children.length < pages) {
+        const p = document.createElement('div'); p.className='page-bg'; bgLayer.appendChild(p);
+    }
+    while (bgLayer.children.length > pages) bgLayer.removeChild(bgLayer.lastChild);
+    const totalW = pages * pw + (pages>1 ? (pages-1)*gap : 0);
+    document.getElementById('canvas').style.width = totalW + 'px';
+    const sc = getScale();
+    scalePlaceholder.style.width  = (totalW * sc) + 'px';
+    scalePlaceholder.style.height = (ph * sc) + 'px';
+    renderBg(); updatePageIndicator(pages);
+}
+function updatePageIndicator(pages) {
+    if (pages===undefined) { const gap=30,cw=editor.clientWidth,cg=gap+80; pages=Math.max(1,Math.round((editor.scrollWidth+cg)/(cw+cg))); }
+    document.getElementById('pageIndicator').innerText = (currentPageIndex+1)+' / '+pages;
+    document.getElementById('pageCount').innerText = pages;
+}
+function scrollToPage(index) {
+    const pw=getPageW(), gap=30, sc=getScale();
+    workspace.scrollTo({ left:index*(pw+gap)*sc, behavior:'smooth' });
+    currentPageIndex=index; updatePageIndicator();
+}
+function prevPage() { if (currentPageIndex>0) scrollToPage(currentPageIndex-1); }
+function nextPage() {
+    const gap=30, cw=editor.clientWidth, cg=gap+80;
+    const pages=Math.max(1,Math.round((editor.scrollWidth+cg)/(cw+cg)));
+    if (currentPageIndex<pages-1) scrollToPage(currentPageIndex+1);
+}
+workspace.addEventListener('scroll', () => {
+    const pw=getPageW(), gap=30, sc=getScale();
+    const idx=Math.round(Math.max(0,workspace.scrollLeft)/((pw+gap)*sc));
+    if (idx!==currentPageIndex) { currentPageIndex=idx; updatePageIndicator(); }
+});
+function scrollToCursor() {
+    const sel=window.getSelection(); if (!sel.rangeCount) return;
+    let rect=sel.getRangeAt(0).getBoundingClientRect();
+    if (!rect.width&&!rect.height) { const n=sel.anchorNode; if (n) rect=(n.nodeType===1?n:n.parentElement)?.getBoundingClientRect()||rect; }
+    const canvasRect=document.getElementById('canvas').getBoundingClientRect();
+    const pw=getPageW(), gap=30, sc=getScale();
+    let tgt=Math.floor((rect.left-canvasRect.left)/((pw+gap)*sc));
+    if (tgt<0) tgt=0;
+    if (tgt!==currentPageIndex) scrollToPage(tgt);
+}
+
+/* ═══════════════════════════════════════
+   EDITOR EVENTS
+═══════════════════════════════════════ */
+editor.addEventListener('paste', e => {
+    e.preventDefault();
+    document.execCommand('insertText', false, (e.originalEvent||e).clipboardData.getData('text/plain'));
+});
+editor.addEventListener('input', () => { saveContent(); updateStats(); checkPages(); setTimeout(scrollToCursor,100); });
+editor.addEventListener('keyup', e => { if (['ArrowRight','ArrowLeft','ArrowDown','ArrowUp','Enter'].includes(e.key)) setTimeout(scrollToCursor,50); });
+editor.addEventListener('click', () => setTimeout(scrollToCursor,50));
+
+function saveContent() { localStorage.setItem('la2_content', editor.innerHTML); }
+function updateStats() { document.getElementById('charCount').innerText=(editor.innerText||'').replace(/\s/g,'').length; }
+
+/* ═══════════════════════════════════════
+   QUOTES TOGGLE
+═══════════════════════════════════════ */
+function toggleQuotes() {
+    const walker=document.createTreeWalker(editor,NodeFilter.SHOW_TEXT,null,false);
+    let node, nodes=[], hasStraight=false;
+    while ((node=walker.nextNode())) { nodes.push(node); if (node.nodeValue.includes('"')||node.nodeValue.includes("'")) hasStraight=true; }
+    nodes.forEach(n => {
+        let v=n.nodeValue;
+        if (hasStraight) { v=v.replace(/(^|[\s\(\[\{<])"/g,'$1\u201c').replace(/"/g,'\u201d').replace(/(^|[\s\(\[\{<])'/g,'$1\u2018').replace(/'/g,'\u2019'); }
+        else             { v=v.replace(/[\u201c\u201d]/g,'"').replace(/[\u2018\u2019]/g,"'"); }
+        n.nodeValue=v;
+    });
+    saveContent(); updateStats();
+}
+
+/* ═══════════════════════════════════════
+   SIDEBAR / TAB / RESIZE
+═══════════════════════════════════════ */
+function toggleSidebar() {
+    sidebar.classList.toggle('collapsed');
+    document.querySelector('.page-controls').style.left =
+        sidebar.classList.contains('collapsed') ? '50%' : 'calc(50% + calc(var(--sidebar-width)/2))';
+}
+function switchTab(id) {
+    document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
+    document.querySelectorAll('.sidebar-scroll .content').forEach(e=>e.classList.remove('active'));
+    document.querySelector('[onclick="switchTab(\''+id+'\')"]').classList.add('active');
+    document.getElementById(id).classList.add('active');
+}
+window.addEventListener('resize', () => {
+    calcZoomScale();
+    const ctrl=document.querySelector('.page-controls');
+    if (window.innerWidth<1100) { sidebar.classList.add('collapsed'); ctrl.style.left='50%'; }
+    else { sidebar.classList.remove('collapsed'); ctrl.style.left='calc(50% + calc(var(--sidebar-width)/2))'; }
+    scrollToPage(currentPageIndex);
+});
+function clearManual() {
+    if (!confirm('에디터 내용을 모두 지우시겠습니까?')) return;
+    editor.innerHTML=''; localStorage.removeItem('la2_content');
+    updateStats(); checkPages(); scrollToPage(0);
+}
+
+/* ═══════════════════════════════════════
+   TOAST
+═══════════════════════════════════════ */
+function showToast(msg) {
+    const t=document.getElementById('toast');
+    t.textContent=msg; t.style.opacity='1';
+    clearTimeout(t._t); t._t=setTimeout(()=>t.style.opacity='0',2200);
+}
+
+/* ═══════════════════════════════════════
+   FILENAME
+═══════════════════════════════════════ */
+function getFilename(pageNum) {
+    const now=new Date(), p=n=>String(n).padStart(2,'0');
+    const dt=now.getFullYear()+p(now.getMonth()+1)+p(now.getDate())+'_'+p(now.getHours())+p(now.getMinutes())+p(now.getSeconds());
+    return 'log_'+dt+'_p'+pageNum+'.png';
+}
+
+/* ═══════════════════════════════════════
+   CAPTURE ENGINE
+═══════════════════════════════════════ */
+async function captureWideCanvas() {
+    document.body.classList.add('is-exporting');
+
+    const zoomWrap=document.querySelector('.zoom-wrap');
+    const origT=zoomWrap.style.transform;
+    zoomWrap.style.transform='none';
+
+    const origPW=scalePlaceholder.style.width, origPH=scalePlaceholder.style.height;
+    const cvs=document.getElementById('canvas');
+    scalePlaceholder.style.width=cvs.style.width;
+    scalePlaceholder.style.height=getPageH()+'px';
+
+    const ws=document.getElementById('workspace'), sc=document.getElementById('scrollContent');
+    const origWsOv=ws.style.overflow;
+    ws.style.overflow='visible'; sc.style.overflow='visible'; document.body.style.overflow='visible';
+    window.scrollTo(0,0); ws.scrollTo(0,0);
+
+    // 구버전 background-color span 처리 (hl-span은 이미 gradient라 그대로)
+    const editorEl=document.getElementById('editor'), origHTML=editorEl.innerHTML;
+    const spansToFix=Array.from(editorEl.querySelectorAll('span')).filter(s=>
+        s.style.backgroundColor && s.style.backgroundColor!=='transparent' && s.style.backgroundColor!=='rgba(0, 0, 0, 0)' && !s.classList.contains('hl-span')
+    );
+    spansToFix.forEach(span => {
+        const bg=span.style.backgroundColor;
+        if (span.getClientRects().length>1) {
+            span.style.backgroundColor='transparent';
+            const walker=document.createTreeWalker(span,NodeFilter.SHOW_TEXT,null,false);
+            let node; const tns=[];
+            while((node=walker.nextNode())) tns.push(node);
+            tns.forEach(tn => {
+                const text=tn.nodeValue; if (!text) return;
+                const frag=document.createDocumentFragment();
+                for (let i=0;i<text.length;i++) {
+                    const cs=document.createElement('span');
+                    cs.style.backgroundColor=bg; cs.style.paddingTop='0'; cs.style.paddingBottom='4px';
+                    if (i===0) { cs.style.paddingLeft='2px'; cs.style.borderTopLeftRadius='4px'; cs.style.borderBottomLeftRadius='4px'; }
+                    if (i===text.length-1) { cs.style.paddingRight='2px'; cs.style.borderTopRightRadius='4px'; cs.style.borderBottomRightRadius='4px'; }
+                    cs.textContent=text[i]; frag.appendChild(cs);
+                }
+                tn.parentNode.replaceChild(frag,tn);
+            });
+        } else { span.style.padding='0 2px 4px 2px'; span.style.borderRadius='4px'; }
+    });
+
+    await new Promise(r=>setTimeout(r,150));
+
+    const wideCanvas=await html2canvas(cvs,{
+        scale:2, useCORS:true, backgroundColor:null,
+        scrollX:0, scrollY:0, width:cvs.offsetWidth, height:cvs.offsetHeight, windowWidth:cvs.offsetWidth+200
+    });
+
+    editorEl.innerHTML=origHTML;
+    zoomWrap.style.transform=origT;
+    scalePlaceholder.style.width=origPW; scalePlaceholder.style.height=origPH;
+    ws.style.overflow=origWsOv; sc.style.overflow=''; document.body.style.overflow='';
+    document.body.classList.remove('is-exporting');
+
+    return wideCanvas;
+}
+
+async function captureSinglePage() {
+    const wideCanvas=await captureWideCanvas();
+    const pw=getPageW(), ph=getPageH(), gap=30, i=currentPageIndex;
+    const sc=document.createElement('canvas'); sc.width=pw*2; sc.height=ph*2;
+    sc.getContext('2d').drawImage(wideCanvas, i*(pw+gap)*2, 0, pw*2, ph*2, 0, 0, pw*2, ph*2);
+    return sc;
+}
+
+/* ── 이미지 저장 ── */
+async function exportCurrentPage() {
+    const btn=document.getElementById('btnExportCur'), orig=btn.innerText;
+    btn.innerText='추출 중... 📸'; btn.style.pointerEvents='none';
+    document.querySelector('.page-controls').style.display='none';
+    try {
+        const sc=await captureSinglePage();
+        const link=document.createElement('a');
+        link.download=getFilename(currentPageIndex+1);
+        link.href=sc.toDataURL('image/png'); link.click();
+    } finally {
+        document.querySelector('.page-controls').style.display='flex';
+        btn.innerText=orig; btn.style.pointerEvents='auto';
+        scrollToPage(currentPageIndex);
+    }
+}
+
+/* ── 클립보드에 이미지 복사 ── */
+async function copyImageToClipboard() {
+    const btn=document.getElementById('btnCopy'), orig=btn.innerText;
+    btn.innerText='처리 중...'; btn.style.pointerEvents='none';
+    document.querySelector('.page-controls').style.display='none';
+    try {
+        const sc=await captureSinglePage();
+        sc.toBlob(async blob => {
+            try {
+                await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+                showToast('이미지가 클립보드에 복사되었습니다');
+                btn.innerText='✓ 이미지 복사됨';
+            } catch(e) {
+                showToast('클립보드 복사 실패 (브라우저 권한 확인)');
+                btn.innerText=orig;
+            }
+            setTimeout(()=>{ btn.innerText=orig; btn.style.pointerEvents='auto'; }, 2300);
+        }, 'image/png');
+    } catch(e) {
+        showToast('캡처 실패: '+e.message);
+        btn.innerText=orig; btn.style.pointerEvents='auto';
+    } finally {
+        document.querySelector('.page-controls').style.display='flex';
+        scrollToPage(currentPageIndex);
+    }
+}
+</script>
+</body>
+</html>
