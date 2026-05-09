@@ -473,25 +473,13 @@ input[type=color] {
         </div>
       </div>
 
-      <!-- 선택 영역 서식 -->
-      <div class="sec">
-        <span class="sec-title">선택 영역 서식</span>
-        <div class="sec-sub">텍스트를 드래그 선택한 뒤 적용하세요 — 선택 부분에만 적용됩니다</div>
-        <div class="lrow">
-          <span class="lrow-label">폰트 크기 <span class="lrow-unit">px</span></span>
-          <input class="num" type="number" id="sel-size" value="10.5" step=".5" min="4" max="96">
-          <button class="btn-apply" onclick="applyToSel('fontSize', id('sel-size').value+'px')">적용</button>
-        </div>
-        <div class="lrow">
-          <span class="lrow-label">굵기 <span class="lrow-unit">font-weight</span></span>
-          <input class="num" type="number" id="sel-weight" value="400" step="100" min="100" max="900">
-          <button class="btn-apply" onclick="applyToSel('fontWeight', id('sel-weight').value)">적용</button>
-        </div>
-      </div>
-
       <!-- 전체 타이포 -->
       <div class="sec">
         <span class="sec-title">전체 타이포그래피</span>
+        <div class="lrow">
+          <span class="lrow-label">폰트 크기 <span class="lrow-unit">px</span></span>
+          <input class="num" type="number" id="fs" value="10.5" step=".5" min="4" max="96" oninput="applyGlobalTypo()">
+        </div>
         <div class="lrow">
           <span class="lrow-label">줄 간격 <span class="lrow-unit">line-height</span></span>
           <input class="num" type="number" id="lh" value="1.7" step=".05" min=".8" max="5" oninput="applyGlobalTypo()">
@@ -545,15 +533,25 @@ input[type=color] {
       <!-- 서식 버튼 -->
       <div class="sec">
         <span class="sec-title">텍스트 서식</span>
+        <!-- 굵기 (선택 영역에 적용) -->
+        <div class="lrow" style="gap:5px">
+          <span class="lrow-label" style="white-space:nowrap">굵기 <span class="lrow-unit">선택 영역</span></span>
+          <div style="display:flex;gap:5px;flex:1;justify-content:flex-end">
+            <button class="fmt-btn" style="font-weight:300;flex:1" onclick="applyToSel('fontWeight','300')">얇게</button>
+            <button class="fmt-btn" style="font-weight:700;flex:1" onclick="applyToSel('fontWeight','700')">굵게</button>
+            <button class="fmt-btn" style="font-weight:900;flex:1" onclick="applyToSel('fontWeight','900')">아주 굵게</button>
+          </div>
+        </div>
+        <!-- 기타 서식 -->
         <div class="fmt-grid">
-          <button class="fmt-btn" style="font-weight:700" onclick="execFmt('bold')">굵게</button>
           <button class="fmt-btn" style="font-style:italic" onclick="execFmt('italic')">기울임</button>
           <button class="fmt-btn" style="text-decoration:underline" onclick="execFmt('underline')">밑줄</button>
+          <button class="fmt-btn" onclick="toggleQuotes()" style="font-size:11px;font-weight:700;color:var(--accent)">" ↔ " 변환</button>
         </div>
         <div class="fmt-grid">
           <button class="fmt-btn" onclick="document.execCommand('undo')" style="font-size:11.5px">↩ 뒤로</button>
           <button class="fmt-btn" onclick="document.execCommand('redo')" style="font-size:11.5px">앞으로 ↪</button>
-          <button class="fmt-btn" onclick="toggleQuotes()" style="font-size:11px;font-weight:700;color:var(--accent)">" ↔ " 변환</button>
+          <button class="fmt-btn" onclick="applyToSel('fontWeight','400')" style="font-size:11px;color:var(--text-2)">굵기 초기화</button>
         </div>
       </div>
 
@@ -590,6 +588,10 @@ input[type=color] {
         <div class="lrow">
           <span class="lrow-label">하단 <span class="lrow-unit">px</span></span>
           <input class="num" type="number" id="mb" value="30" step="2" min="0" max="200" oninput="applyMargins()">
+        </div>
+        <div class="lrow">
+          <span class="lrow-label">좌우 <span class="lrow-unit">px</span></span>
+          <input class="num" type="number" id="mlr" value="40" step="2" min="0" max="200" oninput="applyMargins()">
         </div>
       </div>
 
@@ -698,19 +700,23 @@ const LS = {
   KEY: 'l2i_v1',
   save() {
     localStorage.setItem(this.KEY, JSON.stringify({
+      fs: id('fs').value,
       lh: id('lh').value, ls: id('ls').value,
       pg: id('pg').value, mt: id('mt').value, mb: id('mb').value,
+      mlr: id('mlr').value,
       pageSize, landscape
     }));
   },
   load() {
     try {
       const s = JSON.parse(localStorage.getItem(this.KEY)||'{}');
-      if (s.lh) id('lh').value = s.lh;
-      if (s.ls) id('ls').value = s.ls;
-      if (s.pg) id('pg').value = s.pg;
-      if (s.mt) id('mt').value = s.mt;
-      if (s.mb) id('mb').value = s.mb;
+      if (s.fs)  id('fs').value  = s.fs;
+      if (s.lh)  id('lh').value  = s.lh;
+      if (s.ls)  id('ls').value  = s.ls;
+      if (s.pg)  id('pg').value  = s.pg;
+      if (s.mt)  id('mt').value  = s.mt;
+      if (s.mb)  id('mb').value  = s.mb;
+      if (s.mlr) id('mlr').value = s.mlr;
       if (s.pageSize) pageSize = s.pageSize;
       if (typeof s.landscape==='boolean') landscape = s.landscape;
     } catch(e){}
@@ -813,6 +819,7 @@ function updateSegBtns() {
    GLOBAL TYPOGRAPHY
 ═══════════════════════════════════════════════════ */
 function applyGlobalTypo() {
+  editor.style.fontSize      = id('fs').value + 'px';
   editor.style.lineHeight    = id('lh').value;
   editor.style.letterSpacing = id('ls').value + 'px';
   root.style.setProperty('--para-gap', id('pg').value + 'px');
@@ -825,6 +832,7 @@ function applyGlobalTypo() {
 function applyMargins() {
   root.style.setProperty('--margin-top', id('mt').value + 'px');
   root.style.setProperty('--margin-bot', id('mb').value + 'px');
+  root.style.setProperty('--margin-lr',  id('mlr').value + 'px');
   setTimeout(checkPages, 50);
   LS.save();
 }
